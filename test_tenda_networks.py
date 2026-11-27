@@ -91,15 +91,15 @@ class NetworkTests(unittest.TestCase):
         view.client.activate_connection_async.assert_not_called()
 
     def test_reutiliza_perfil_multiconexion_y_elige_ap_compatible(self):
-        ap_24 = access_point(b"eduroam", flags=SEC.KEY_MGMT_802_1X, strength=90)
-        ap_5 = access_point(b"eduroam", flags=SEC.KEY_MGMT_802_1X, strength=75)
+        ap_24 = access_point(b"CorpWiFi", flags=SEC.KEY_MGMT_802_1X, strength=90)
+        ap_5 = access_point(b"CorpWiFi", flags=SEC.KEY_MGMT_802_1X, strength=75)
         ap_5.get_path.return_value = "/org/freedesktop/NetworkManager/AccessPoint/55"
         ap_24.connection_valid.return_value = False
         ap_5.connection_valid.return_value = True
         view = picker(ap_24)
         view.device.get_access_points.return_value = [ap_24, ap_5]
         saved, active = Mock(), Mock()
-        active.get_uuid.return_value = saved.get_uuid.return_value = "eduroam-uuid"
+        active.get_uuid.return_value = saved.get_uuid.return_value = "corp-uuid"
         active.get_devices.return_value = [Mock()]
         saved.get_setting_connection.return_value.get_multi_connect.return_value = (
             NM.ConnectionMultiConnect.MANUAL_MULTIPLE
