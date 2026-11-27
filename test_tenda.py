@@ -100,6 +100,26 @@ class TendaTests(unittest.TestCase):
             with patch.object(hw, "Path", side_effect=lambda p: (root / "net") if p == "/sys/class/net" else Path(p)):
                 self.assertEqual(hw.find_wifi_iface_for_usb(usb_dev), "wlan0")
 
+    def test_detecta_bluetooth_interno_generico_excluyendo_tenda(self):
+        with tempfile.TemporaryDirectory() as folder:
+            usb_root = Path(folder)
+            tenda = usb_root / "1-4"
+            tenda.mkdir()
+            (tenda / "idVendor").write_text("2604\n")
+            (tenda / "idProduct").write_text("001f\n")
+            (tenda / "bDeviceClass").write_text("e0\n")
+            (tenda / "bDeviceSubClass").write_text("01\n")
+            (tenda / "bDeviceProtocol").write_text("01\n")
+            intel_bt = usb_root / "3-5"
+            intel_bt.mkdir()
+            (intel_bt / "idVendor").write_text("8087\n")
+            (intel_bt / "idProduct").write_text("0032\n")
+            (intel_bt / "bDeviceClass").write_text("e0\n")
+            (intel_bt / "bDeviceSubClass").write_text("01\n")
+            (intel_bt / "bDeviceProtocol").write_text("01\n")
+            with patch.object(hw, "Path", side_effect=lambda p: usb_root if p == "/sys/bus/usb/devices" else Path(p)):
+                self.assertEqual(hw.find_internal_bt_usb(), intel_bt)
+
 
     def test_speedtest_calcula_mbps_y_devuelve_resultado(self):
         self.assertAlmostEqual(speedtest._mbps(1_250_000, 1.0), 10.0)

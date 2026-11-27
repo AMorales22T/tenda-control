@@ -13,13 +13,13 @@ import time
 from pathlib import Path
 
 from tenda_hardware import (
-    INTERNAL_BT_PID,
-    INTERNAL_BT_VID,
     TENDA_BT_IFACES,
     TENDA_PID,
     TENDA_VID,
     TENDA_WIFI_IFACE,
     UDEV_RULE_PATH,
+    find_bt_interfaces,
+    find_internal_bt_usb,
     find_internal_wifi_iface,
     find_usb_device,
     find_usb_interfaces,
@@ -125,13 +125,13 @@ def set_internal_wifi(enable: bool) -> None:
 
 
 def set_internal_bt(enable: bool) -> None:
-    usb = find_usb_device(INTERNAL_BT_VID, INTERNAL_BT_PID)
+    usb = find_internal_bt_usb()
     if usb is None:
-        raise RuntimeError("No se detecta el Bluetooth interno compatible.")
+        raise RuntimeError("No se detecta un Bluetooth interno USB compatible.")
     if enable:
         _write_sysfs(usb / "authorized", "1")
         _write_sysfs(usb / "power/control", "on")
-    ifaces = find_usb_interfaces(usb, ("00", "01"))
+    ifaces = find_bt_interfaces(usb) or find_usb_interfaces(usb, ("00", "01"))
     if ifaces:
         _authorize(ifaces, enable)
     elif not enable:

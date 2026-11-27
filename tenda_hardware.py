@@ -16,9 +16,6 @@ TENDA_PID = "001f"
 TENDA_BT_IFACES = ("00", "01")
 TENDA_WIFI_IFACE = "02"
 
-INTERNAL_BT_VID = "0bda"
-INTERNAL_BT_PID = "0852"
-
 UDEV_RULE_PATH = Path("/etc/udev/rules.d/99-tenda-wifi.rules")
 
 
@@ -88,6 +85,43 @@ def find_usb_interfaces(usb_dev: Path, iface_numbers: tuple[str, ...]) -> list[P
         if num in iface_numbers:
             results.append(entry)
     return results
+
+
+def _is_bt_descriptor(path: Path, prefix: str) -> bool:
+    return (
+        _read_text(path / f"{prefix}Class").lower() == "e0"
+        and _read_text(path / f"{prefix}SubClass").lower() == "01"
+        and _read_text(path / f"{prefix}Protocol").lower() == "01"
+    )
+
+
+def find_bt_interfaces(usb_dev: Path) -> list[Path]:
+    prefix = f"{usb_dev.name}:"
+    try:
+        entries = sorted(usb_dev.iterdir())
+    except FileNotFoundError:
+        return []
+    return [
+        entry for entry in entries
+        if entry.name.startswith(prefix) and _is_bt_descriptor(entry, "bInterface")
+    ]
+
+
+def find_internal_bt_usb() -> Optional[Path]:
+    """Detecta el controlador Bluetooth USB interno excluyendo el adaptador Tenda."""
+    usb_root = Path("/sys/bus/usb/devices")
+    if not usb_root.exists():
+        return None
+    for entry in sorted(usb_root.iterdir()):
+        if ":" in entry.name:
+            continue
+        vid = _read_text(entry / "idVendor").lower()
+        pid = _read_text(entry / "idProduct").lower()
+        if not vid or (vid == TENDA_VID and pid == TENDA_PID):
+            continue
+        if _is_bt_descriptor(entry, "bDevice") or find_bt_interfaces(entry):
+            return entry
+    return None
 
 
 def _find_hci_for_usb(usb_dev: Optional[Path]) -> Optional[str]:
@@ -250,7 +284,7 @@ def outbound_ipv4_iface() -> str | None:
 
 def get_system_state() -> SystemRadioState:
     tenda_usb = find_usb_device(TENDA_VID, TENDA_PID)
-    internal_bt_usb = find_usb_device(INTERNAL_BT_VID, INTERNAL_BT_PID)
+    internal_bt_usb = find_internal_bt_usb()
     internal_wifi_iface = find_internal_wifi_iface()
 
     # Tenda Wi-Fi
@@ -321,7 +355,7 @@ def get_system_state() -> SystemRadioState:
     internal_bt_enabled = False
     if internal_bt_usb is not None:
         dev_auth = _read_text(internal_bt_usb / "authorized")
-        bt_ifaces = find_usb_interfaces(internal_bt_usb, ("00", "01"))
+        bt_ifaces = find_bt_interfaces(internal_bt_usb) or find_usb_interfaces(internal_bt_usb, ("00", "01"))
         if bt_ifaces:
             internal_bt_enabled = dev_auth == "1" and any(_read_text(p / "authorized") == "1" for p in bt_ifaces)
         else:
